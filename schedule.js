@@ -2,7 +2,7 @@
 // Timezone note: We'll compute "now" using Malaysia time via Intl API.
 
 window.SCHEDULE = {
-  title: "Jadual Penjagaan Mak (Wad)",
+  title: "Jadual Penjagaan Mi (Wad Hospital Jerantut)",
   timezone: "Asia/Kuala_Lumpur",
   windowStart: "2025-12-28T20:00:00",
   windowEnd: "2025-12-31T20:00:00",
