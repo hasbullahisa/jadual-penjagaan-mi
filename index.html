@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="ms">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Jadual Penjagaan (Live)</title>
+
+  <!-- Mermaid -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script src="./schedule.js"></script>
+
+  <style>
+    body { font-family: -apple-system, system-ui, Segoe UI, Roboto, Arial, sans-serif; margin: 16px; line-height: 1.35; }
+    .card { border: 1px solid #ddd; border-radius: 12px; padding: 14px; margin: 12px 0; }
+    .title { font-size: 20px; font-weight: 800; }
+    .sub { color: #555; margin-top: 6px; }
+    .on { font-size: 22px; font-weight: 900; }
+    .pill { display:inline-block; padding: 4px 10px; border-radius: 999px; border: 1px solid #ddd; margin-left: 8px; font-size: 12px; }
+    .warn { background: #fff6d6; border-color: #f2d17d; }
+    .ok { background: #e9f7ef; border-color: #bfe6cf; }
+    .bad { background: #fdecec; border-color: #f5b5b5; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 10px 8px; border-bottom: 1px solid #eee; text-align: left; vertical-align: top; }
+    th { font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: #666; }
+    .muted { color: #666; font-size: 13px; }
+    .small { font-size: 12px; color: #777; }
+    .highlight { font-weight: 900; }
+    .footer { margin-top: 14px; font-size: 12px; color: #666; }
+    .mermaid { margin-top: 12px; }
+  </style>
+</head>
+
+<body>
+  <div class="card">
+    <div class="title" id="pageTitle">Jadual Penjagaan (Live)</div>
+    <div class="sub">
+      Masa rujukan: <span class="highlight" id="tzLabel"></span>
+      <span class="pill" id="statusPill"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="muted">🔴 Sedang bertugas sekarang</div>
+    <div class="on" id="onDutyText">Memuatkan...</div>
+    <div class="small" id="onDutyWindow"></div>
+    <div class="footer" id="backupText"></div>
+  </div>
+
+  <div class="card">
+    <div class="muted">📋 Jadual (senang scroll)</div>
+    <div id="tableWrap"></div>
+  </div>
+
+  <div class="card">
+    <div class="muted">📊 Timeline (Mermaid)</div>
+    <div class="mermaid" id="mermaidGantt">Loading...</div>
+  </div>
+
+<script>
+  // --- Helpers (timezone-safe for Asia/Kuala_Lumpur) ---
+  function nowInTZ(tz) {
+    // returns a Date object representing "now" but formatted in tz and re-parsed.
+    // Good enough for shift selection, without external libs.
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: tz,
+      year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", second: "2-digit",
+      hour12: false
+    }).formatToParts(new Date());
+
+    const get = (type) => parts.find(p => p.type === type)?.value;
+    const isoLike = `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}:${get("second")}`;
+    return new Date(isoLike);
+  }
+
+  function fmt(dtStr, tz) {
+    const d = new Date(dtStr);
+    return new Intl.DateTimeFormat("ms-MY", {
+      timeZone: tz,
+      weekday: "short", year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", hour12: false
+    }).format(d);
+  }
+
+  function minsLeft(now, end) {
+    const ms = end - now;
+    return Math.max(0, Math.floor(ms / 60000));
+  }
+
+  function pad2(n){ return String(n).padStart(2,"0"); }
+
+  function formatCountdown(mins) {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return `${h}j ${pad2(m)}m`;
+  }
+
+  function findOnDuty(schedule, now) {
+    const start = new Date(schedule.windowStart);
+    const end = new Date(schedule.windowEnd);
+
+    if (now < start) return { state: "not_started", start, end };
+    if (now >= end) return { state: "ended", start, end };
+
+    const slot = schedule.slots.find(s => now >= new Date(s.start) && now < new Date(s.end));
+    return { state: slot ? "active" : "gap", slot, start, end };
+  }
+
+  function buildTable(schedule, now, tz) {
+    const rows = schedule.slots
+      .slice()
+      .sort((a,b) => new Date(a.start) - new Date(b.start))
+      .map(s => {
+        const isNow = now >= new Date(s.start) && now < new Date(s.end);
+        return `
+          <tr>
+            <td>${fmt(s.start, tz)}<br><span class="small">→ ${fmt(s.end, tz)}</span></td>
+            <td>${isNow ? "🔴 <span class='highlight'>" + s.person + "</span>" : s.person}</td>
+            <td>${isNow ? "<span class='highlight'>" + s.label + "</span>" : s.label}</td>
+          </tr>
+        `;
+      }).join("");
+
+    return `
+      <table>
+        <thead>
+          <tr><th>Masa</th><th>Penjaga</th><th>Slot</th></tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+  }
+
+  function buildMermaid(schedule) {
+    // Mermaid Gantt expects dateFormat & durations.
+    // We'll create tasks with explicit start and end via "start, end".
+    const tz = schedule.timezone;
+
+    const tasks = schedule.slots
+      .slice()
+      .sort((a,b) => new Date(a.start) - new Date(b.start))
+      .map((s, i) => {
+        const id = `t${i+1}`;
+        // Mermaid: Task : id, start, end
+        return `${s.person} (${s.label}) : ${id}, ${s.start.replace("T"," ")}, ${s.end.replace("T"," ")}`;
+      });
+
+    return `
+gantt
+  title ${schedule.title} — (Timezone: ${tz})
+  dateFormat  YYYY-MM-DD HH:mm
+  axisFormat  %d/%m %H:%M
+
+  section Shift
+  ${tasks.join("\n  ")}
+    `.trim();
+  }
+
+  // --- Render ---
+  (function init() {
+    const schedule = window.SCHEDULE;
+    const tz = schedule.timezone;
+
+    document.getElementById("pageTitle").innerText = schedule.title + " (Live)";
+    document.getElementById("tzLabel").innerText = tz;
+    document.getElementById("backupText").innerText = "Backup: " + schedule.backup;
+
+    const render = () => {
+      const now = nowInTZ(tz);
+      const status = findOnDuty(schedule, now);
+
+      const pill = document.getElementById("statusPill");
+      const onDuty = document.getElementById("onDutyText");
+      const windowText = document.getElementById("onDutyWindow");
+
+      windowText.innerText =
+        `Window: ${fmt(schedule.windowStart, tz)} → ${fmt(schedule.windowEnd, tz)}`;
+
+      if (status.state === "not_started") {
+        pill.className = "pill warn";
+        pill.innerText = "Belum bermula";
+        onDuty.innerText = "Belum mula (tunggu masuk waktu).";
+      } else if (status.state === "ended") {
+        pill.className = "pill bad";
+        pill.innerText = "Tamat";
+        onDuty.innerText = "Jadual 3 hari tamat. (Sila kemas kini jika sambung).";
+      } else if (status.state === "gap") {
+        pill.className = "pill warn";
+        pill.innerText = "Tiada slot";
+        onDuty.innerText = "Tiada slot ditemui untuk masa sekarang (check jadual).";
+      } else {
+        const end = new Date(status.slot.end);
+        const left = minsLeft(now, end);
+        pill.className = "pill ok";
+        pill.innerText = "Sedang berjalan";
+        onDuty.innerText = `🔴 ${status.slot.person} — ${status.slot.label} (baki ${formatCountdown(left)})`;
+      }
+
+      document.getElementById("tableWrap").innerHTML = buildTable(schedule, now, tz);
+
+      // Mermaid re-render: replace diagram text then init
+      const gantt = buildMermaid(schedule);
+      const el = document.getElementById("mermaidGantt");
+      el.textContent = gantt;
+
+      // Re-run mermaid
+      mermaid.initialize({ startOnLoad: false });
+      mermaid.run({ querySelector: "#mermaidGantt" });
+    };
+
+    render();
+    // Update every 30 seconds
+    setInterval(render, 30000);
+  })();
+</script>
+
+</body>
+</html>
