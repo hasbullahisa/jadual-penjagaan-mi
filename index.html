@@ -3,9 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Jadual Penjagaan Mi (Live)</title>
+  <title>Jadual Penjagaan (Live)</title>
 
-  <!-- Mermaid -->
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
   <script src="./schedule.js"></script>
 
@@ -27,6 +26,20 @@
     .highlight { font-weight: 900; }
     .footer { margin-top: 14px; font-size: 12px; color: #666; }
     .mermaid { margin-top: 12px; }
+
+    /* Editor UI */
+    .row { display:flex; gap:12px; flex-wrap:wrap; }
+    .col { flex: 1; min-width: 260px; }
+    textarea { width:100%; min-height: 220px; padding: 10px; border-radius: 10px; border: 1px solid #ddd; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; }
+    input, select { width:100%; padding: 10px; border-radius: 10px; border: 1px solid #ddd; }
+    button { padding: 10px 12px; border-radius: 10px; border: 1px solid #ddd; background: white; cursor:pointer; }
+    button:hover { background:#f7f7f7; }
+    .btn-primary { border-color:#1f6feb; }
+    .btn-danger { border-color:#d73a49; }
+    .btn-mini { padding: 7px 10px; font-size: 12px; border-radius: 9px; }
+    .note { background: #f7faff; border-color: #cfe3ff; }
+    .inline { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    .hidden { display:none; }
   </style>
 </head>
 
@@ -36,6 +49,10 @@
     <div class="sub">
       Masa rujukan: <span class="highlight" id="tzLabel"></span>
       <span class="pill" id="statusPill"></span>
+      <span class="pill note" id="modePill">Mode: Live</span>
+    </div>
+    <div class="small">
+      ✅ Tip: Tekan <b>Edit</b> untuk ubah jadual dalam browser, kemudian <b>Copy output</b> dan paste ke <code>schedule.js</code>.
     </div>
   </div>
 
@@ -44,6 +61,68 @@
     <div class="on" id="onDutyText">Memuatkan...</div>
     <div class="small" id="onDutyWindow"></div>
     <div class="footer" id="backupText"></div>
+  </div>
+
+  <!-- Editor Panel -->
+  <div class="card" id="editorCard">
+    <div class="inline">
+      <div class="muted">🛠 Editor (senang ubah jadual)</div>
+      <button class="btn-mini btn-primary" id="toggleEditBtn">Edit</button>
+      <button class="btn-mini" id="useLiveBtn" title="Kembali guna jadual dari schedule.js">Guna Live</button>
+      <button class="btn-mini" id="saveLocalBtn" title="Simpan draft dalam browser (localStorage)">Save Draft</button>
+      <button class="btn-mini" id="loadLocalBtn" title="Load draft dari browser (localStorage)">Load Draft</button>
+      <button class="btn-mini btn-danger" id="clearLocalBtn" title="Padam draft local">Clear Draft</button>
+    </div>
+
+    <div id="editorBody" class="hidden" style="margin-top:12px;">
+      <div class="row">
+        <div class="col">
+          <div class="muted">1) Paste / edit schedule JSON</div>
+          <textarea id="jsonInput" spellcheck="false"></textarea>
+          <div class="small">Format mesti JSON. Masa guna format: <code>YYYY-MM-DDTHH:mm:ss</code></div>
+        </div>
+
+        <div class="col">
+          <div class="muted">2) Output untuk paste ke <code>schedule.js</code></div>
+          <textarea id="jsOutput" spellcheck="false" readonly></textarea>
+          <div class="inline" style="margin-top:8px;">
+            <button class="btn-mini btn-primary" id="copyJsBtn">Copy schedule.js</button>
+            <button class="btn-mini" id="applyPreviewBtn">Preview guna JSON editor</button>
+            <button class="btn-mini" id="sortSlotsBtn">Sort slot ikut masa</button>
+            <button class="btn-mini" id="addSlotBtn">+ Add Slot</button>
+          </div>
+          <div class="small">Lepas copy: buka repo → edit <code>schedule.js</code> → paste → commit.</div>
+        </div>
+      </div>
+
+      <div class="card note" style="margin-top:12px;">
+        <div class="muted"><b>Quick add slot</b> (optional)</div>
+        <div class="row" style="margin-top:10px;">
+          <div class="col">
+            <label class="small">Start</label>
+            <input id="qStart" placeholder="2025-12-31T20:00:00" />
+          </div>
+          <div class="col">
+            <label class="small">End</label>
+            <input id="qEnd" placeholder="2026-01-01T08:00:00" />
+          </div>
+          <div class="col">
+            <label class="small">Person</label>
+            <input id="qPerson" placeholder="Bibik Yuni" />
+          </div>
+          <div class="col">
+            <label class="small">Label</label>
+            <select id="qLabel">
+              <option>Malam</option>
+              <option>Pagi</option>
+              <option>Petang</option>
+              <option>On-call</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+    </div>
   </div>
 
   <div class="card">
@@ -59,8 +138,6 @@
 <script>
   // --- Helpers (timezone-safe for Asia/Kuala_Lumpur) ---
   function nowInTZ(tz) {
-    // returns a Date object representing "now" but formatted in tz and re-parsed.
-    // Good enough for shift selection, without external libs.
     const parts = new Intl.DateTimeFormat("en-CA", {
       timeZone: tz,
       year: "numeric", month: "2-digit", day: "2-digit",
@@ -123,25 +200,19 @@
 
     return `
       <table>
-        <thead>
-          <tr><th>Masa</th><th>Penjaga</th><th>Slot</th></tr>
-        </thead>
+        <thead><tr><th>Masa</th><th>Penjaga</th><th>Slot</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     `;
   }
 
   function buildMermaid(schedule) {
-    // Mermaid Gantt expects dateFormat & durations.
-    // We'll create tasks with explicit start and end via "start, end".
     const tz = schedule.timezone;
-
     const tasks = schedule.slots
       .slice()
       .sort((a,b) => new Date(a.start) - new Date(b.start))
       .map((s, i) => {
         const id = `t${i+1}`;
-        // Mermaid: Task : id, start, end
         return `${s.person} (${s.label}) : ${id}, ${s.start.replace("T"," ")}, ${s.end.replace("T"," ")}`;
       });
 
@@ -156,61 +227,213 @@ gantt
     `.trim();
   }
 
-  // --- Render ---
-  (function init() {
-    const schedule = window.SCHEDULE;
+  function renderDashboard(schedule, modeLabel) {
     const tz = schedule.timezone;
 
     document.getElementById("pageTitle").innerText = schedule.title + " (Live)";
     document.getElementById("tzLabel").innerText = tz;
-    document.getElementById("backupText").innerText = "Backup: " + schedule.backup;
+    document.getElementById("backupText").innerText = "Backup: " + (schedule.backup || "-");
 
-    const render = () => {
-      const now = nowInTZ(tz);
-      const status = findOnDuty(schedule, now);
+    const modePill = document.getElementById("modePill");
+    modePill.textContent = "Mode: " + modeLabel;
 
-      const pill = document.getElementById("statusPill");
-      const onDuty = document.getElementById("onDutyText");
-      const windowText = document.getElementById("onDutyWindow");
+    const now = nowInTZ(tz);
+    const status = findOnDuty(schedule, now);
 
-      windowText.innerText =
-        `Window: ${fmt(schedule.windowStart, tz)} → ${fmt(schedule.windowEnd, tz)}`;
+    const pill = document.getElementById("statusPill");
+    const onDuty = document.getElementById("onDutyText");
+    const windowText = document.getElementById("onDutyWindow");
 
-      if (status.state === "not_started") {
-        pill.className = "pill warn";
-        pill.innerText = "Belum bermula";
-        onDuty.innerText = "Belum mula (tunggu masuk waktu).";
-      } else if (status.state === "ended") {
-        pill.className = "pill bad";
-        pill.innerText = "Tamat";
-        onDuty.innerText = "Jadual 3 hari tamat. (Sila kemas kini jika sambung).";
-      } else if (status.state === "gap") {
-        pill.className = "pill warn";
-        pill.innerText = "Tiada slot";
-        onDuty.innerText = "Tiada slot ditemui untuk masa sekarang (check jadual).";
-      } else {
-        const end = new Date(status.slot.end);
-        const left = minsLeft(now, end);
-        pill.className = "pill ok";
-        pill.innerText = "Sedang berjalan";
-        onDuty.innerText = `🔴 ${status.slot.person} — ${status.slot.label} (baki ${formatCountdown(left)})`;
+    windowText.innerText = `Window: ${fmt(schedule.windowStart, tz)} → ${fmt(schedule.windowEnd, tz)}`;
+
+    if (status.state === "not_started") {
+      pill.className = "pill warn"; pill.innerText = "Belum bermula";
+      onDuty.innerText = "Belum mula (tunggu masuk waktu).";
+    } else if (status.state === "ended") {
+      pill.className = "pill bad"; pill.innerText = "Tamat";
+      onDuty.innerText = "Jadual tamat. (Sila kemas kini jika sambung).";
+    } else if (status.state === "gap") {
+      pill.className = "pill warn"; pill.innerText = "Tiada slot";
+      onDuty.innerText = "Tiada slot ditemui untuk masa sekarang (check jadual).";
+    } else {
+      const end = new Date(status.slot.end);
+      const left = minsLeft(now, end);
+      pill.className = "pill ok"; pill.innerText = "Sedang berjalan";
+      onDuty.innerText = `🔴 ${status.slot.person} — ${status.slot.label} (baki ${formatCountdown(left)})`;
+    }
+
+    document.getElementById("tableWrap").innerHTML = buildTable(schedule, now, tz);
+
+    const gantt = buildMermaid(schedule);
+    const el = document.getElementById("mermaidGantt");
+    el.textContent = gantt;
+
+    mermaid.initialize({ startOnLoad: false });
+    mermaid.run({ querySelector: "#mermaidGantt" });
+  }
+
+  // --- Editor helpers ---
+  function scheduleToJs(scheduleObj) {
+    const pretty = JSON.stringify(scheduleObj, null, 2);
+    return `// schedule.js\n\nwindow.SCHEDULE = ${pretty};\n`;
+  }
+
+  function safeParseJson(text) {
+    try { return { ok: true, value: JSON.parse(text) }; }
+    catch (e) { return { ok: false, error: e.message }; }
+  }
+
+  function normalizeSchedule(s) {
+    // minimal validation + defaults
+    if (!s.timezone) s.timezone = "Asia/Kuala_Lumpur";
+    if (!Array.isArray(s.slots)) s.slots = [];
+    return s;
+  }
+
+  function sortSlots(s) {
+    s.slots.sort((a,b) => new Date(a.start) - new Date(b.start));
+    return s;
+  }
+
+  // --- Init ---
+  (function init() {
+    const liveSchedule = window.SCHEDULE;
+    let currentSchedule = liveSchedule;
+    let mode = "Live";
+
+    // initial render
+    renderDashboard(currentSchedule, mode);
+
+    // refresh live view every 30s (but if in Preview, we still refresh using preview schedule)
+    setInterval(() => renderDashboard(currentSchedule, mode), 30000);
+
+    // editor UI refs
+    const toggleBtn = document.getElementById("toggleEditBtn");
+    const editorBody = document.getElementById("editorBody");
+    const jsonInput = document.getElementById("jsonInput");
+    const jsOutput = document.getElementById("jsOutput");
+
+    const useLiveBtn = document.getElementById("useLiveBtn");
+    const applyPreviewBtn = document.getElementById("applyPreviewBtn");
+    const copyJsBtn = document.getElementById("copyJsBtn");
+    const saveLocalBtn = document.getElementById("saveLocalBtn");
+    const loadLocalBtn = document.getElementById("loadLocalBtn");
+    const clearLocalBtn = document.getElementById("clearLocalBtn");
+    const sortSlotsBtn = document.getElementById("sortSlotsBtn");
+    const addSlotBtn = document.getElementById("addSlotBtn");
+
+    const qStart = document.getElementById("qStart");
+    const qEnd = document.getElementById("qEnd");
+    const qPerson = document.getElementById("qPerson");
+    const qLabel = document.getElementById("qLabel");
+
+    // Pre-fill editor with LIVE schedule
+    jsonInput.value = JSON.stringify(liveSchedule, null, 2);
+    jsOutput.value = scheduleToJs(liveSchedule);
+
+    function updateOutputsFromInput() {
+      const parsed = safeParseJson(jsonInput.value);
+      if (!parsed.ok) {
+        jsOutput.value = "JSON error: " + parsed.error;
+        return null;
       }
+      const s = normalizeSchedule(parsed.value);
+      jsOutput.value = scheduleToJs(s);
+      return s;
+    }
 
-      document.getElementById("tableWrap").innerHTML = buildTable(schedule, now, tz);
+    toggleBtn.addEventListener("click", () => {
+      const open = editorBody.classList.contains("hidden");
+      editorBody.classList.toggle("hidden", !open);
+      toggleBtn.textContent = open ? "Close" : "Edit";
+    });
 
-      // Mermaid re-render: replace diagram text then init
-      const gantt = buildMermaid(schedule);
-      const el = document.getElementById("mermaidGantt");
-      el.textContent = gantt;
+    jsonInput.addEventListener("input", () => {
+      updateOutputsFromInput();
+    });
 
-      // Re-run mermaid
-      mermaid.initialize({ startOnLoad: false });
-      mermaid.run({ querySelector: "#mermaidGantt" });
-    };
+    applyPreviewBtn.addEventListener("click", () => {
+      const s = updateOutputsFromInput();
+      if (!s) return;
+      currentSchedule = s;
+      mode = "Preview";
+      renderDashboard(currentSchedule, mode);
+    });
 
-    render();
-    // Update every 30 seconds
-    setInterval(render, 30000);
+    useLiveBtn.addEventListener("click", () => {
+      currentSchedule = liveSchedule;
+      mode = "Live";
+      jsonInput.value = JSON.stringify(liveSchedule, null, 2);
+      jsOutput.value = scheduleToJs(liveSchedule);
+      renderDashboard(currentSchedule, mode);
+    });
+
+    sortSlotsBtn.addEventListener("click", () => {
+      const s = updateOutputsFromInput();
+      if (!s) return;
+      sortSlots(s);
+      jsonInput.value = JSON.stringify(s, null, 2);
+      jsOutput.value = scheduleToJs(s);
+    });
+
+    addSlotBtn.addEventListener("click", () => {
+      const s = updateOutputsFromInput();
+      if (!s) return;
+      const slot = {
+        start: qStart.value.trim(),
+        end: qEnd.value.trim(),
+        person: qPerson.value.trim() || "Nama",
+        label: qLabel.value
+      };
+      // basic guard
+      if (!slot.start || !slot.end) {
+        alert("Isi start & end dulu (format: YYYY-MM-DDTHH:mm:ss).");
+        return;
+      }
+      s.slots.push(slot);
+      sortSlots(s);
+      // auto-expand windowEnd if needed
+      try {
+        const we = new Date(s.windowEnd);
+        const newEnd = new Date(slot.end);
+        if (newEnd > we) s.windowEnd = slot.end;
+      } catch {}
+      jsonInput.value = JSON.stringify(s, null, 2);
+      jsOutput.value = scheduleToJs(s);
+    });
+
+    copyJsBtn.addEventListener("click", async () => {
+      const s = updateOutputsFromInput();
+      if (!s) return;
+      try {
+        await navigator.clipboard.writeText(jsOutput.value);
+        copyJsBtn.textContent = "Copied ✅";
+        setTimeout(() => copyJsBtn.textContent = "Copy schedule.js", 1200);
+      } catch {
+        alert("Clipboard tak bagi (browser policy). Copy manual dari box output.");
+      }
+    });
+
+    const LS_KEY = "jadual_penjagaan_draft_v1";
+    saveLocalBtn.addEventListener("click", () => {
+      const s = updateOutputsFromInput();
+      if (!s) return;
+      localStorage.setItem(LS_KEY, jsonInput.value);
+      alert("Draft disimpan dalam browser (local).");
+    });
+
+    loadLocalBtn.addEventListener("click", () => {
+      const raw = localStorage.getItem(LS_KEY);
+      if (!raw) return alert("Tiada draft lagi.");
+      jsonInput.value = raw;
+      updateOutputsFromInput();
+      alert("Draft loaded. Tekan 'Preview' kalau nak tengok.");
+    });
+
+    clearLocalBtn.addEventListener("click", () => {
+      localStorage.removeItem(LS_KEY);
+      alert("Draft local dipadam.");
+    });
   })();
 </script>
 
