@@ -40,6 +40,14 @@
     .note { background: #f7faff; border-color: #cfe3ff; }
     .inline { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
     .hidden { display:none; }
+
+    /* Umi History */
+    .history { margin-top: 10px; }
+    .history-item { border-top: 1px dashed #dbe7ff; padding: 10px 0; }
+    .history-item:first-child { border-top: none; padding-top: 0; }
+    .history-time { font-size: 12px; color: #666; }
+    .history-text { margin-top: 4px; font-weight: 600; white-space: pre-wrap; }
+    .history-actions { margin-top: 6px; }
   </style>
 </head>
 
@@ -52,7 +60,7 @@
       <span class="pill note" id="modePill">Mode: Live</span>
     </div>
     <div class="small">
-      ✅ Tip: Tekan <b>Edit</b> untuk ubah jadual dalam browser, kemudian <b>Copy output</b> dan paste ke <code>schedule.js</code>.
+      ✅ Tip: Tekan <b>Edit</b> untuk ubah jadual / kemas kini Umi (perlukan PIN). Orang lain cuma view.
     </div>
   </div>
 
@@ -63,15 +71,48 @@
     <div class="footer" id="backupText"></div>
   </div>
 
-  <!-- Editor Panel -->
+  <!-- UMI STATUS + HISTORY -->
+  <div class="card note">
+    <div class="inline">
+      <div class="muted">🩺 Kemas Kini Keadaan Umi</div>
+      <span class="pill" id="umiFreshPill">—</span>
+    </div>
+
+    <div id="umiStatusText" style="margin-top:6px;font-weight:700; white-space: pre-wrap;">
+      Belum ada kemas kini.
+    </div>
+    <div class="small" id="umiStatusTime" style="margin-top:4px;">—</div>
+
+    <!-- Editor area (PIN required) -->
+    <div id="umiEditor" class="hidden" style="margin-top:12px;">
+      <div class="muted">Tambah update baru</div>
+      <textarea id="umiInput" placeholder="Contoh: Umi lebih stabil. O2 ok. Antibiotik diteruskan. Makan bubur sikit."></textarea>
+
+      <div class="inline" style="margin-top:8px;">
+        <button class="btn-mini btn-primary" id="saveUmiBtn">Save Update</button>
+        <button class="btn-mini" id="prefillUmiBtn" title="Ambil text update terkini untuk edit">Prefill Latest</button>
+        <button class="btn-mini btn-danger" id="clearUmiAllBtn" title="Padam semua history (hati-hati)">Clear All History</button>
+      </div>
+
+      <div class="small" style="margin-top:6px;">
+        Nota: Update disimpan dalam <b>browser/device</b> (localStorage). Kalau nak semua device sama, kena update melalui satu device yang sama atau kita upgrade ke Google Sheet/Firebase nanti.
+      </div>
+    </div>
+
+    <div class="history" id="umiHistoryWrap">
+      <!-- history list -->
+    </div>
+  </div>
+
+  <!-- EDITOR PANEL (Schedule) -->
   <div class="card" id="editorCard">
     <div class="inline">
-      <div class="muted">🛠 Editor (senang ubah jadual)</div>
+      <div class="muted">🛠 Editor Jadual (senang ubah)</div>
       <button class="btn-mini btn-primary" id="toggleEditBtn">Edit</button>
       <button class="btn-mini" id="useLiveBtn" title="Kembali guna jadual dari schedule.js">Guna Live</button>
-      <button class="btn-mini" id="saveLocalBtn" title="Simpan draft dalam browser (localStorage)">Save Draft</button>
-      <button class="btn-mini" id="loadLocalBtn" title="Load draft dari browser (localStorage)">Load Draft</button>
-      <button class="btn-mini btn-danger" id="clearLocalBtn" title="Padam draft local">Clear Draft</button>
+      <button class="btn-mini" id="saveLocalBtn" title="Simpan draft jadual dalam browser (localStorage)">Save Draft</button>
+      <button class="btn-mini" id="loadLocalBtn" title="Load draft jadual dari browser (localStorage)">Load Draft</button>
+      <button class="btn-mini btn-danger" id="clearLocalBtn" title="Padam draft jadual local">Clear Draft</button>
     </div>
 
     <div id="editorBody" class="hidden" style="margin-top:12px;">
@@ -79,7 +120,7 @@
         <div class="col">
           <div class="muted">1) Paste / edit schedule JSON</div>
           <textarea id="jsonInput" spellcheck="false"></textarea>
-          <div class="small">Format mesti JSON. Masa guna format: <code>YYYY-MM-DDTHH:mm:ss</code></div>
+          <div class="small">Masa: <code>YYYY-MM-DDTHH:mm:ss</code></div>
         </div>
 
         <div class="col">
@@ -87,16 +128,16 @@
           <textarea id="jsOutput" spellcheck="false" readonly></textarea>
           <div class="inline" style="margin-top:8px;">
             <button class="btn-mini btn-primary" id="copyJsBtn">Copy schedule.js</button>
-            <button class="btn-mini" id="applyPreviewBtn">Preview guna JSON editor</button>
-            <button class="btn-mini" id="sortSlotsBtn">Sort slot ikut masa</button>
+            <button class="btn-mini" id="applyPreviewBtn">Preview</button>
+            <button class="btn-mini" id="sortSlotsBtn">Sort slot</button>
             <button class="btn-mini" id="addSlotBtn">+ Add Slot</button>
           </div>
-          <div class="small">Lepas copy: buka repo → edit <code>schedule.js</code> → paste → commit.</div>
+          <div class="small">Lepas copy: edit <code>schedule.js</code> dalam repo → paste → commit.</div>
         </div>
       </div>
 
       <div class="card note" style="margin-top:12px;">
-        <div class="muted"><b>Quick add slot</b> (optional)</div>
+        <div class="muted"><b>Quick add slot</b></div>
         <div class="row" style="margin-top:10px;">
           <div class="col">
             <label class="small">Start</label>
@@ -136,7 +177,14 @@
   </div>
 
 <script>
-  // --- Helpers (timezone-safe for Asia/Kuala_Lumpur) ---
+  // =====================================================
+  // PIN SETTINGS (tukar PIN kat sini)
+  // =====================================================
+  const EDITOR_PIN = "2580";
+
+  // =====================================================
+  // TIME + GENERAL HELPERS
+  // =====================================================
   function nowInTZ(tz) {
     const parts = new Intl.DateTimeFormat("en-CA", {
       timeZone: tz,
@@ -159,12 +207,12 @@
     }).format(d);
   }
 
+  function pad2(n){ return String(n).padStart(2,"0"); }
+
   function minsLeft(now, end) {
     const ms = end - now;
     return Math.max(0, Math.floor(ms / 60000));
   }
-
-  function pad2(n){ return String(n).padStart(2,"0"); }
 
   function formatCountdown(mins) {
     const h = Math.floor(mins / 60);
@@ -172,6 +220,21 @@
     return `${h}j ${pad2(m)}m`;
   }
 
+  function minutesAgo(iso) {
+    const diffMs = Date.now() - new Date(iso).getTime();
+    const mins = Math.floor(diffMs / 60000);
+    if (mins < 1) return "baru sahaja";
+    if (mins < 60) return `${mins} minit lalu`;
+    const hrs = Math.floor(mins / 60);
+    const rem = mins % 60;
+    if (hrs < 24) return `${hrs} jam ${rem}m lalu`;
+    const days = Math.floor(hrs / 24);
+    return `${days} hari lalu`;
+  }
+
+  // =====================================================
+  // SCHEDULE (LIVE) RENDER
+  // =====================================================
   function findOnDuty(schedule, now) {
     const start = new Date(schedule.windowStart);
     const end = new Date(schedule.windowEnd);
@@ -233,9 +296,7 @@ gantt
     document.getElementById("pageTitle").innerText = schedule.title + " (Live)";
     document.getElementById("tzLabel").innerText = tz;
     document.getElementById("backupText").innerText = "Backup: " + (schedule.backup || "-");
-
-    const modePill = document.getElementById("modePill");
-    modePill.textContent = "Mode: " + modeLabel;
+    document.getElementById("modePill").textContent = "Mode: " + modeLabel;
 
     const now = nowInTZ(tz);
     const status = findOnDuty(schedule, now);
@@ -272,7 +333,9 @@ gantt
     mermaid.run({ querySelector: "#mermaidGantt" });
   }
 
-  // --- Editor helpers ---
+  // =====================================================
+  // EDITOR (Schedule) HELPERS
+  // =====================================================
   function scheduleToJs(scheduleObj) {
     const pretty = JSON.stringify(scheduleObj, null, 2);
     return `// schedule.js\n\nwindow.SCHEDULE = ${pretty};\n`;
@@ -284,7 +347,6 @@ gantt
   }
 
   function normalizeSchedule(s) {
-    // minimal validation + defaults
     if (!s.timezone) s.timezone = "Asia/Kuala_Lumpur";
     if (!Array.isArray(s.slots)) s.slots = [];
     return s;
@@ -295,19 +357,186 @@ gantt
     return s;
   }
 
-  // --- Init ---
+  // =====================================================
+  // UMI STATUS + HISTORY (LocalStorage)
+  // =====================================================
+  const UMI_KEY = "umi_status_history_v1";
+
+  function loadUmiHistory() {
+    const raw = localStorage.getItem(UMI_KEY);
+    if (!raw) return [];
+    try {
+      const arr = JSON.parse(raw);
+      return Array.isArray(arr) ? arr : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function saveUmiHistory(historyArr) {
+    localStorage.setItem(UMI_KEY, JSON.stringify(historyArr));
+  }
+
+  function addUmiUpdate(text) {
+    const history = loadUmiHistory();
+    history.unshift({
+      id: crypto?.randomUUID ? crypto.randomUUID() : String(Date.now()),
+      text,
+      updatedAt: new Date().toISOString()
+    });
+    saveUmiHistory(history);
+    return history;
+  }
+
+  function deleteUmiItem(id) {
+    const history = loadUmiHistory().filter(x => x.id !== id);
+    saveUmiHistory(history);
+    return history;
+  }
+
+  function latestUmiUpdate() {
+    const history = loadUmiHistory();
+    return history.length ? history[0] : null;
+  }
+
+  function renderUmi() {
+    const latest = latestUmiUpdate();
+    const textEl = document.getElementById("umiStatusText");
+    const timeEl = document.getElementById("umiStatusTime");
+    const pill = document.getElementById("umiFreshPill");
+
+    if (!latest) {
+      textEl.innerText = "Belum ada kemas kini.";
+      timeEl.innerText = "—";
+      pill.className = "pill warn";
+      pill.innerText = "Tiada update";
+    } else {
+      textEl.innerText = latest.text;
+      timeEl.innerText = `Dikemas kini ${minutesAgo(latest.updatedAt)}`;
+      // freshness pill
+      const mins = Math.floor((Date.now() - new Date(latest.updatedAt).getTime()) / 60000);
+      if (mins <= 30) { pill.className = "pill ok"; pill.innerText = "Terkini"; }
+      else { pill.className = "pill warn"; pill.innerText = "Lama"; }
+    }
+
+    // history list
+    const wrap = document.getElementById("umiHistoryWrap");
+    const history = loadUmiHistory();
+
+    if (!history.length) {
+      wrap.innerHTML = `<div class="small" style="margin-top:10px;">History kosong.</div>`;
+      return;
+    }
+
+    wrap.innerHTML = `
+      <div class="muted" style="margin-top:10px;">📜 History update</div>
+      ${history.map((h, idx) => `
+        <div class="history-item">
+          <div class="history-time">${idx === 0 ? "⭐ Latest • " : ""}${fmt(h.updatedAt, "Asia/Kuala_Lumpur")} • ${minutesAgo(h.updatedAt)}</div>
+          <div class="history-text">${escapeHtml(h.text)}</div>
+          <div class="history-actions">
+            <button class="btn-mini btn-danger" data-del="${h.id}" title="Padam entry ni (perlukan PIN)">Delete</button>
+          </div>
+        </div>
+      `).join("")}
+    `;
+
+    // attach delete handlers (PIN-protected)
+    wrap.querySelectorAll("button[data-del]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        if (!window.__editorUnlocked) {
+          alert("Editor dikunci (perlukan PIN).");
+          return;
+        }
+        const id = btn.getAttribute("data-del");
+        if (!confirm("Padam entry ini?")) return;
+        deleteUmiItem(id);
+        renderUmi();
+      });
+    });
+  }
+
+  function escapeHtml(str) {
+    return String(str)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  // =====================================================
+  // INIT
+  // =====================================================
   (function init() {
     const liveSchedule = window.SCHEDULE;
     let currentSchedule = liveSchedule;
     let mode = "Live";
 
-    // initial render
+    // global editor lock flag
+    window.__editorUnlocked = false;
+
+    // render everything
     renderDashboard(currentSchedule, mode);
+    renderUmi();
+    setInterval(() => {
+      renderDashboard(currentSchedule, mode);
+      renderUmi(); // update "xx min ago"
+    }, 30000);
 
-    // refresh live view every 30s (but if in Preview, we still refresh using preview schedule)
-    setInterval(() => renderDashboard(currentSchedule, mode), 30000);
+    // ----------------------
+    // PIN Unlock helper
+    // ----------------------
+    function requirePinUnlock() {
+      if (window.__editorUnlocked) return true;
+      const pin = prompt("Masukkan PIN untuk edit:");
+      if (pin !== EDITOR_PIN) {
+        alert("PIN salah. Editor dikunci.");
+        return false;
+      }
+      window.__editorUnlocked = true;
+      document.getElementById("modePill").textContent = "Mode: Edit (Unlocked)";
+      // show Umi editor when unlocked
+      document.getElementById("umiEditor").classList.remove("hidden");
+      return true;
+    }
 
-    // editor UI refs
+    // ----------------------
+    // UMI editor buttons
+    // ----------------------
+    const umiInput = document.getElementById("umiInput");
+    const saveUmiBtn = document.getElementById("saveUmiBtn");
+    const prefillUmiBtn = document.getElementById("prefillUmiBtn");
+    const clearUmiAllBtn = document.getElementById("clearUmiAllBtn");
+
+    saveUmiBtn.addEventListener("click", () => {
+      if (!requirePinUnlock()) return;
+      const text = umiInput.value.trim();
+      if (!text) return alert("Isi update dulu.");
+      addUmiUpdate(text);
+      umiInput.value = "";
+      renderUmi();
+      alert("Update Umi disimpan ✅");
+    });
+
+    prefillUmiBtn.addEventListener("click", () => {
+      if (!requirePinUnlock()) return;
+      const latest = latestUmiUpdate();
+      if (!latest) return alert("Belum ada update lagi.");
+      umiInput.value = latest.text;
+    });
+
+    clearUmiAllBtn.addEventListener("click", () => {
+      if (!requirePinUnlock()) return;
+      if (!confirm("Padam SEMUA history? (irreversible)")) return;
+      localStorage.removeItem(UMI_KEY);
+      renderUmi();
+      umiInput.value = "";
+    });
+
+    // ----------------------
+    // Schedule editor refs
+    // ----------------------
     const toggleBtn = document.getElementById("toggleEditBtn");
     const editorBody = document.getElementById("editorBody");
     const jsonInput = document.getElementById("jsonInput");
@@ -327,7 +556,7 @@ gantt
     const qPerson = document.getElementById("qPerson");
     const qLabel = document.getElementById("qLabel");
 
-    // Pre-fill editor with LIVE schedule
+    // Prefill editor with LIVE schedule
     jsonInput.value = JSON.stringify(liveSchedule, null, 2);
     jsOutput.value = scheduleToJs(liveSchedule);
 
@@ -342,17 +571,18 @@ gantt
       return s;
     }
 
+    jsonInput.addEventListener("input", () => { updateOutputsFromInput(); });
+
     toggleBtn.addEventListener("click", () => {
+      if (!requirePinUnlock()) return;
+
       const open = editorBody.classList.contains("hidden");
       editorBody.classList.toggle("hidden", !open);
       toggleBtn.textContent = open ? "Close" : "Edit";
     });
 
-    jsonInput.addEventListener("input", () => {
-      updateOutputsFromInput();
-    });
-
     applyPreviewBtn.addEventListener("click", () => {
+      if (!requirePinUnlock()) return;
       const s = updateOutputsFromInput();
       if (!s) return;
       currentSchedule = s;
@@ -369,6 +599,7 @@ gantt
     });
 
     sortSlotsBtn.addEventListener("click", () => {
+      if (!requirePinUnlock()) return;
       const s = updateOutputsFromInput();
       if (!s) return;
       sortSlots(s);
@@ -377,6 +608,7 @@ gantt
     });
 
     addSlotBtn.addEventListener("click", () => {
+      if (!requirePinUnlock()) return;
       const s = updateOutputsFromInput();
       if (!s) return;
       const slot = {
@@ -385,14 +617,12 @@ gantt
         person: qPerson.value.trim() || "Nama",
         label: qLabel.value
       };
-      // basic guard
       if (!slot.start || !slot.end) {
         alert("Isi start & end dulu (format: YYYY-MM-DDTHH:mm:ss).");
         return;
       }
       s.slots.push(slot);
       sortSlots(s);
-      // auto-expand windowEnd if needed
       try {
         const we = new Date(s.windowEnd);
         const newEnd = new Date(slot.end);
@@ -403,6 +633,7 @@ gantt
     });
 
     copyJsBtn.addEventListener("click", async () => {
+      if (!requirePinUnlock()) return;
       const s = updateOutputsFromInput();
       if (!s) return;
       try {
@@ -410,27 +641,31 @@ gantt
         copyJsBtn.textContent = "Copied ✅";
         setTimeout(() => copyJsBtn.textContent = "Copy schedule.js", 1200);
       } catch {
-        alert("Clipboard tak bagi (browser policy). Copy manual dari box output.");
+        alert("Clipboard tak bagi. Copy manual dari box output.");
       }
     });
 
+    // Draft schedule save/load
     const LS_KEY = "jadual_penjagaan_draft_v1";
     saveLocalBtn.addEventListener("click", () => {
+      if (!requirePinUnlock()) return;
       const s = updateOutputsFromInput();
       if (!s) return;
       localStorage.setItem(LS_KEY, jsonInput.value);
-      alert("Draft disimpan dalam browser (local).");
+      alert("Draft jadual disimpan (local).");
     });
 
     loadLocalBtn.addEventListener("click", () => {
+      if (!requirePinUnlock()) return;
       const raw = localStorage.getItem(LS_KEY);
       if (!raw) return alert("Tiada draft lagi.");
       jsonInput.value = raw;
       updateOutputsFromInput();
-      alert("Draft loaded. Tekan 'Preview' kalau nak tengok.");
+      alert("Draft loaded. Tekan Preview kalau nak tengok.");
     });
 
     clearLocalBtn.addEventListener("click", () => {
+      if (!requirePinUnlock()) return;
       localStorage.removeItem(LS_KEY);
       alert("Draft local dipadam.");
     });
