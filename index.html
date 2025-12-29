@@ -5,245 +5,279 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Jadual Penjagaan (Live)</title>
 
-  <!-- Mermaid -->
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
-
-  <!-- Schedule -->
   <script src="./schedule.js"></script>
 
   <style>
-    body {
-      font-family: -apple-system, system-ui, Segoe UI, Roboto, Arial, sans-serif;
-      margin: 16px;
-      line-height: 1.4;
-      background: #fafafa;
+    body{
+      font-family:-apple-system,system-ui,Segoe UI,Roboto,Arial,sans-serif;
+      margin:16px; line-height:1.4; background:#fafafa;
     }
-    .card {
-      background: white;
-      border: 1px solid #ddd;
-      border-radius: 14px;
-      padding: 14px;
-      margin-bottom: 14px;
+    .card{
+      background:#fff; border:1px solid #ddd; border-radius:14px;
+      padding:14px; margin-bottom:14px;
     }
-    .title { font-size: 20px; font-weight: 800; }
-    .sub { color: #555; margin-top: 4px; }
-    .on { font-size: 22px; font-weight: 900; margin-top: 6px; }
+    .title{ font-size:20px; font-weight:900; }
+    .sub{ color:#555; margin-top:6px; font-size:13px; }
+    .pill{
+      display:inline-block; padding:4px 10px; border-radius:999px;
+      border:1px solid #ddd; font-size:12px; margin-left:8px;
+    }
+    .ok{ background:#e9f7ef; border-color:#bfe6cf; }
+    .warn{ background:#fff6d6; border-color:#f2d17d; }
+    .bad{ background:#fdecec; border-color:#f5b5b5; }
 
-    .pill {
-      display: inline-block;
-      padding: 4px 10px;
-      border-radius: 999px;
-      border: 1px solid #ddd;
-      font-size: 12px;
-      margin-left: 6px;
-    }
-    .ok { background: #e9f7ef; border-color: #bfe6cf; }
-    .warn { background: #fff6d6; border-color: #f2d17d; }
-    .bad { background: #fdecec; border-color: #f5b5b5; }
+    .muted{ color:#666; font-size:13px; }
+    .small{ font-size:12px; color:#777; }
+    .highlight{ font-weight:900; }
 
-    .muted { color: #666; font-size: 13px; }
-    .small { font-size: 12px; color: #777; }
-    .highlight { font-weight: 900; }
+    .onDutyBox{
+      border:1px solid #cfe3ff; background:#f7faff;
+      border-radius:12px; padding:12px;
+    }
+    .onTitle{ display:flex; align-items:center; gap:8px; font-weight:900; font-size:18px; }
+    .dot{
+      width:10px; height:10px; border-radius:50%;
+      display:inline-block; flex:0 0 10px;
+      border:1px solid rgba(0,0,0,.12);
+    }
+    .dot-green{ background:#16a34a; }
+    .dot-red{ background:#dc2626; }
+    .dot-gray{ background:#9ca3af; }
 
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 6px;
-    }
-    th, td {
-      padding: 8px;
-      border-bottom: 1px solid #eee;
-      text-align: left;
-    }
-    th {
-      font-size: 12px;
-      text-transform: uppercase;
-      color: #666;
-    }
+    table{ width:100%; border-collapse:collapse; margin-top:10px; }
+    th,td{ padding:10px 8px; border-bottom:1px solid #eee; vertical-align:top; text-align:left; }
+    th{ font-size:12px; text-transform:uppercase; color:#666; letter-spacing:.04em; }
 
-    .history-item {
-      border-top: 1px dashed #ddd;
-      padding-top: 8px;
-      margin-top: 8px;
+    /* Row states */
+    tr.active-row td{
+      background:#ecfdf3; /* soft green */
+      border-bottom-color:#d6f5e3;
+      font-weight:700;
     }
-    .history-time {
-      font-size: 12px;
-      color: #666;
+    tr.done-row td{
+      color:#b91c1c;
+      background:#fff5f5; /* soft red */
     }
-    .history-text {
-      margin-top: 4px;
-      font-weight: 600;
-      white-space: pre-wrap;
+    tr.future-row td{
+      color:#374151;
+      background:#fff;
     }
+    .cellFlex{ display:flex; gap:8px; align-items:flex-start; }
+    .timeBlock{ white-space:nowrap; }
+    .noteLine{ white-space:pre-wrap; font-weight:700; margin-top:6px; }
+    .history-item{
+      border-top:1px dashed #ddd; padding-top:8px; margin-top:8px;
+    }
+    .history-time{ font-size:12px; color:#666; }
+    .history-text{ margin-top:4px; font-weight:600; white-space:pre-wrap; }
+
+    .mermaid{ margin-top:10px; }
   </style>
 </head>
 
 <body>
 
-<!-- HEADER -->
-<div class="card">
-  <div class="title" id="pageTitle">Jadual Penjagaan Mak (Live)</div>
-  <div class="sub">
-    Masa rujukan: <b>Asia/Kuala_Lumpur</b>
-    <span class="pill" id="statusPill">—</span>
+  <!-- Header -->
+  <div class="card">
+    <div class="title" id="pageTitle">Jadual Penjagaan Mak (Live)</div>
+    <div class="sub">
+      Masa rujukan: <b id="tzLabel">Asia/Kuala_Lumpur</b>
+      <span class="pill" id="statusPill">—</span>
+    </div>
+    <div class="small">Tip: refresh kalau baru commit `umi-status.json` / `schedule.js`.</div>
   </div>
-</div>
 
-<!-- ON DUTY -->
-<div class="card">
-  <div class="muted">🔴 Sedang bertugas sekarang</div>
-  <div class="on" id="onDutyText">Memuatkan…</div>
-  <div class="small" id="onDutyWindow"></div>
-  <div class="small" id="backupText"></div>
-</div>
-
-<!-- UMI STATUS -->
-<div class="card">
-  <div class="muted">🩺 Kemas Kini Keadaan Umi</div>
-  <div id="umiStatusText" class="highlight" style="margin-top:6px;">
-    Memuatkan…
+  <!-- On duty -->
+  <div class="card">
+    <div class="muted">Sedang bertugas sekarang</div>
+    <div class="onDutyBox">
+      <div class="onTitle">
+        <span class="dot dot-green"></span>
+        <span id="onDutyText">Memuatkan…</span>
+      </div>
+      <div class="small" id="onDutyWindow" style="margin-top:6px;"></div>
+      <div class="small" id="backupText" style="margin-top:4px;"></div>
+    </div>
   </div>
-  <div class="small" id="umiStatusTime"></div>
 
-  <div id="umiHistoryWrap" style="margin-top:10px;"></div>
-</div>
+  <!-- Umi status -->
+  <div class="card">
+    <div class="muted">🩺 Kemas Kini Keadaan Umi</div>
+    <div id="umiStatusText" class="noteLine">Memuatkan…</div>
+    <div class="small" id="umiStatusTime"></div>
+    <div id="umiHistoryWrap" style="margin-top:10px;"></div>
+  </div>
 
-<!-- JADUAL TABLE -->
-<div class="card">
-  <div class="muted">📋 Jadual Penjagaan</div>
-  <div id="tableWrap"></div>
-</div>
+  <!-- Schedule table -->
+  <div class="card">
+    <div class="muted">📋 Jadual Penjagaan (ikut turutan bertugas)</div>
+    <div id="tableWrap"></div>
+  </div>
 
-<!-- MERMAID -->
-<div class="card">
-  <div class="muted">📊 Timeline</div>
-  <div class="mermaid" id="mermaidGantt">Loading…</div>
-</div>
+  <!-- Timeline -->
+  <div class="card">
+    <div class="muted">📊 Timeline</div>
+    <div class="mermaid" id="mermaidGantt">Loading…</div>
+  </div>
 
 <script>
-/* =====================================================
-   UTILITIES
-===================================================== */
-function minutesAgo(iso) {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "baru sahaja";
-  if (mins < 60) return mins + " minit lalu";
-  const hrs = Math.floor(mins / 60);
-  const rem = mins % 60;
-  if (hrs < 24) return hrs + " jam " + rem + "m lalu";
-  return Math.floor(hrs / 24) + " hari lalu";
-}
+  const TZ = "Asia/Kuala_Lumpur";
+  const UMI_JSON_URL = "./umi-status.json";
 
-function fmt(dt) {
-  return new Intl.DateTimeFormat("ms-MY", {
-    dateStyle: "short",
-    timeStyle: "short",
-    hour12: false,
-    timeZone: "Asia/Kuala_Lumpur"
-  }).format(new Date(dt));
-}
-
-/* =====================================================
-   SCHEDULE
-===================================================== */
-function renderSchedule() {
-  const tz = "Asia/Kuala_Lumpur";
-  const now = new Date();
-
-  const statusPill = document.getElementById("statusPill");
-  const onDutyText = document.getElementById("onDutyText");
-  const onDutyWindow = document.getElementById("onDutyWindow");
-  const backupText = document.getElementById("backupText");
-
-  const slot = SCHEDULE.slots.find(
-    s => now >= new Date(s.start) && now < new Date(s.end)
-  );
-
-  if (!slot) {
-    statusPill.className = "pill warn";
-    statusPill.innerText = "Tiada slot";
-    onDutyText.innerText = "Tiada penjaga dikesan sekarang";
-  } else {
-    statusPill.className = "pill ok";
-    statusPill.innerText = "Sedang berjalan";
-    onDutyText.innerText = "🔴 " + slot.person + " — " + slot.label;
+  // Parse time as +08:00 if no timezone included
+  function parseKL(ts){
+    if (!ts) return new Date(NaN);
+    // if already has Z or +hh:mm or -hh:mm, keep
+    const hasTZ = /Z$|[+\-]\d{2}:\d{2}$/.test(ts);
+    const fixed = hasTZ ? ts : (ts + "+08:00");
+    return new Date(fixed);
   }
 
-  onDutyWindow.innerText =
-    "Window: " + fmt(SCHEDULE.windowStart) + " → " + fmt(SCHEDULE.windowEnd);
-  backupText.innerText = "Backup: " + (SCHEDULE.backup || "-");
+  function fmt(dt) {
+    return new Intl.DateTimeFormat("ms-MY", {
+      timeZone: TZ,
+      weekday: "short",
+      year: "2-digit",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false
+    }).format(parseKL(dt));
+  }
 
-  // Table
-  document.getElementById("tableWrap").innerHTML = `
-    <table>
-      <thead>
-        <tr><th>Masa</th><th>Penjaga</th><th>Slot</th></tr>
-      </thead>
-      <tbody>
-        ${SCHEDULE.slots.map(s => `
-          <tr>
-            <td>${fmt(s.start)} → ${fmt(s.end)}</td>
-            <td>${s.person}</td>
-            <td>${s.label}</td>
-          </tr>
-        `).join("")}
-      </tbody>
-    </table>
-  `;
+  function minutesAgo(isoLike) {
+    const d = parseKL(isoLike);
+    const diff = Date.now() - d.getTime();
+    const mins = Math.floor(diff / 60000);
+    if (!isFinite(mins)) return "—";
+    if (mins < 1) return "baru sahaja";
+    if (mins < 60) return mins + " minit lalu";
+    const hrs = Math.floor(mins / 60);
+    const rem = mins % 60;
+    if (hrs < 24) return hrs + " jam " + rem + "m lalu";
+    return Math.floor(hrs / 24) + " hari lalu";
+  }
 
-  // Mermaid
-  const gantt = `
+  function renderSchedule(){
+    const now = new Date();
+
+    const slots = (SCHEDULE?.slots || [])
+      .slice()
+      .sort((a,b) => parseKL(a.start) - parseKL(b.start));
+
+    const winStart = SCHEDULE?.windowStart;
+    const winEnd = SCHEDULE?.windowEnd;
+
+    // Determine current slot
+    const current = slots.find(s => now >= parseKL(s.start) && now < parseKL(s.end));
+
+    const statusPill = document.getElementById("statusPill");
+    const onDutyText = document.getElementById("onDutyText");
+    const onDutyWindow = document.getElementById("onDutyWindow");
+    const backupText = document.getElementById("backupText");
+
+    onDutyWindow.innerText = `Window: ${fmt(winStart)} → ${fmt(winEnd)}`;
+    backupText.innerText = `Backup: ${SCHEDULE?.backup || "-"}`;
+
+    if (current){
+      statusPill.className = "pill ok";
+      statusPill.innerText = "Sedang berjalan";
+      onDutyText.innerText = `${current.person} — ${current.label}`;
+    } else {
+      // if schedule ended
+      const ended = winEnd && now >= parseKL(winEnd);
+      statusPill.className = ended ? "pill bad" : "pill warn";
+      statusPill.innerText = ended ? "Tamat" : "Tiada slot";
+      onDutyText.innerText = ended ? "Jadual tamat (kemas kini jika sambung)" : "Tiada penjaga dikesan sekarang";
+    }
+
+    // Build table
+    const rows = slots.map(s => {
+      const start = parseKL(s.start);
+      const end = parseKL(s.end);
+
+      let state = "future";
+      if (now >= end) state = "done";
+      else if (now >= start && now < end) state = "active";
+
+      const dotClass = state === "active" ? "dot-green" : (state === "done" ? "dot-red" : "dot-gray");
+      const trClass = state === "active" ? "active-row" : (state === "done" ? "done-row" : "future-row");
+
+      return `
+        <tr class="${trClass}">
+          <td>
+            <div class="cellFlex">
+              <span class="dot ${dotClass}"></span>
+              <div class="timeBlock">
+                ${fmt(s.start)} → ${fmt(s.end)}
+              </div>
+            </div>
+          </td>
+          <td>${s.person}</td>
+          <td>${s.label}</td>
+        </tr>
+      `;
+    }).join("");
+
+    document.getElementById("tableWrap").innerHTML = `
+      <table>
+        <thead><tr><th>Masa</th><th>Penjaga</th><th>Slot</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+
+    // Mermaid (optional)
+    const gantt = `
 gantt
   title Jadual Penjagaan Mak
   dateFormat YYYY-MM-DD HH:mm
   axisFormat %d/%m %H:%M
 
   section Shift
-  ${SCHEDULE.slots.map((s,i)=>`${s.person} (${s.label}) : t${i}, ${s.start.replace("T"," ")}, ${s.end.replace("T"," ")}`).join("\n  ")}
-  `;
-  const el = document.getElementById("mermaidGantt");
-  el.textContent = gantt;
-  mermaid.initialize({ startOnLoad: false });
-  mermaid.run({ querySelector: "#mermaidGantt" });
-}
+  ${slots.map((s,i)=>`${s.person} (${s.label}) : t${i}, ${s.start.replace("T"," ")}, ${s.end.replace("T"," ")}`).join("\n  ")}
+    `.trim();
 
-/* =====================================================
-   UMI STATUS FROM GITHUB JSON
-===================================================== */
-const UMI_JSON_URL = "./umi-status.json";
-
-async function renderUmi() {
-  try {
-    const res = await fetch(UMI_JSON_URL + "?t=" + Date.now());
-    const data = await res.json();
-
-    document.getElementById("umiStatusText").innerText = data.latest.text;
-    document.getElementById("umiStatusTime").innerText =
-      "Dikemas kini " + minutesAgo(data.latest.updatedAt);
-
-    document.getElementById("umiHistoryWrap").innerHTML = `
-      <div class="muted">📜 History update</div>
-      ${data.history.map(h => `
-        <div class="history-item">
-          <div class="history-time">${fmt(h.updatedAt)} • ${minutesAgo(h.updatedAt)}</div>
-          <div class="history-text">${h.text}</div>
-        </div>
-      `).join("")}
-    `;
-  } catch (e) {
-    document.getElementById("umiStatusText").innerText =
-      "Gagal load status umi.";
+    const el = document.getElementById("mermaidGantt");
+    el.textContent = gantt;
+    mermaid.initialize({ startOnLoad:false });
+    mermaid.run({ querySelector:"#mermaidGantt" });
   }
-}
 
-/* =====================================================
-   INIT
-===================================================== */
-renderSchedule();
-renderUmi();
-setInterval(renderSchedule, 30000);
-setInterval(renderUmi, 60000);
+  async function renderUmi(){
+    try{
+      const res = await fetch(UMI_JSON_URL + "?t=" + Date.now(), { cache:"no-store" });
+      const data = await res.json();
+
+      document.getElementById("umiStatusText").innerText = data?.latest?.text || "—";
+      document.getElementById("umiStatusTime").innerText =
+        data?.latest?.updatedAt ? ("Dikemas kini " + minutesAgo(data.latest.updatedAt)) : "—";
+
+      const history = (data?.history || []).slice().sort((a,b)=> parseKL(b.updatedAt) - parseKL(a.updatedAt));
+      const html = history.map((h,idx)=>`
+        <div class="history-item">
+          <div class="history-time">${idx===0 ? "⭐ Latest • " : ""}${fmt(h.updatedAt)} • ${minutesAgo(h.updatedAt)}</div>
+          <div class="history-text">${h.text || "—"}</div>
+        </div>
+      `).join("");
+
+      document.getElementById("umiHistoryWrap").innerHTML = `
+        <div class="muted">📜 History update</div>
+        ${html || "<div class='small'>History kosong.</div>"}
+      `;
+    } catch(e){
+      document.getElementById("umiStatusText").innerText = "Gagal load status umi.";
+      document.getElementById("umiStatusTime").innerText = "";
+      document.getElementById("umiHistoryWrap").innerHTML = "";
+    }
+  }
+
+  // Init
+  renderSchedule();
+  renderUmi();
+  setInterval(renderSchedule, 30000);
+  setInterval(renderUmi, 60000);
 </script>
 
 </body>
