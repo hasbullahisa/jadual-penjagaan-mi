@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title> [Live] Keadaan Kesihatan Tok CT </title>
+  <title>Jadual Penjagaan (Live)</title>
 
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
   <script src="./schedule.js"></script>
@@ -16,7 +16,7 @@
     .card{
       background:#fff; border:1px solid #ddd; border-radius:14px;
       padding:14px; margin-bottom:14px;
-      overflow:hidden; /* important: keep inside box */
+      overflow:hidden;
     }
     .title{ font-size:20px; font-weight:900; }
     .sub{ color:#555; margin-top:6px; font-size:13px; }
@@ -30,7 +30,7 @@
 
     .muted{ color:#666; font-size:13px; }
     .small{ font-size:12px; color:#777; }
-    .highlight{ font-weight:900; }
+    .strong{ font-weight:900; }
 
     .onDutyBox{
       border:1px solid #cfe3ff; background:#f7faff;
@@ -46,7 +46,7 @@
     .dot-red{ background:#dc2626; }
     .dot-gray{ background:#9ca3af; }
 
-    /* List style like your 2nd screenshot */
+    /* Schedule list (mobile-friendly) */
     .listHeader{
       display:grid;
       grid-template-columns: 1fr 110px 80px;
@@ -67,47 +67,30 @@
       align-items:start;
     }
     .row:last-child{ border-bottom:none; }
-    .cellTime{
-      display:flex; gap:10px; align-items:flex-start;
-      min-width:0;
-    }
-    .timeMain{
-      font-weight:800;
-      word-break:break-word;
-    }
-    .timeSub{
-      margin-top:4px;
-      font-size:12px;
-      color:#777;
-    }
-    .cellName{
-      font-weight:800;
-      word-break:break-word;
-    }
-    .cellSlot{
-      font-weight:800;
-      word-break:break-word;
-      text-align:left;
-    }
+    .cellTime{ display:flex; gap:10px; align-items:flex-start; min-width:0; }
+    .timeMain{ font-weight:800; word-break:break-word; }
+    .timeSub{ margin-top:4px; font-size:12px; color:#777; }
+    .cellName{ font-weight:800; word-break:break-word; }
+    .cellSlot{ font-weight:800; word-break:break-word; }
 
-    .row.active{
-      background:#ecfdf3;
-      border-bottom-color:#d6f5e3;
-    }
-    .row.done{
-      background:#fff5f5;
-      color:#b91c1c;
-    }
-    .row.future{
-      background:#fff;
-      color:#111827;
-    }
+    .row.active{ background:#ecfdf3; border-bottom-color:#d6f5e3; }
+    .row.done{ background:#fff5f5; color:#b91c1c; }
+    .row.future{ background:#fff; color:#111827; }
 
-    .umiText{
-      white-space:pre-wrap;
-      font-weight:800;
-      margin-top:6px;
+    /* Umi update */
+    .umiText{ white-space:pre-wrap; font-weight:900; margin-top:6px; }
+    .actionRow{ display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
+    .btn{
+      appearance:none; border:1px solid #ddd; background:#fff;
+      border-radius:12px; padding:10px 12px; font-weight:800;
+      font-size:13px; cursor:pointer;
     }
+    .btnPrimary{ background:#111827; color:#fff; border-color:#111827; }
+    .btnOk{ background:#16a34a; color:#fff; border-color:#16a34a; }
+    .btn:active{ transform:scale(.99); }
+
+    /* History (optional) */
+    .historyWrap{ margin-top:12px; }
     .history-item{
       border-top:1px dashed #ddd; padding-top:8px; margin-top:8px;
     }
@@ -122,12 +105,12 @@
 
   <!-- Header -->
   <div class="card">
-    <div class="title" id="pageTitle">Jadual Penjagaan Mak (Live)</div>
+    <div class="title">Jadual Penjagaan Mak (Live)</div>
     <div class="sub">
-      Masa rujukan: <b id="tzLabel">Asia/Kuala_Lumpur</b>
+      Masa rujukan: <b>Asia/Kuala_Lumpur</b>
       <span class="pill" id="statusPill">—</span>
     </div>
-    <div class="small">Refresh kalau baru commit fail.</div>
+    <div class="small">Update paling senang: edit <b>latest.txt</b> guna GitHub app.</div>
   </div>
 
   <!-- On duty -->
@@ -143,12 +126,24 @@
     </div>
   </div>
 
-  <!-- Umi status -->
+  <!-- Umi update (latest.txt) -->
   <div class="card">
     <div class="muted">🩺 Kemas Kini Keadaan Umi</div>
+
     <div id="umiStatusText" class="umiText">Memuatkan…</div>
     <div class="small" id="umiStatusTime"></div>
-    <div id="umiHistoryWrap" style="margin-top:10px;"></div>
+
+    <div class="actionRow">
+      <button class="btn btnPrimary" id="btnCopyWA">Copy WhatsApp Update</button>
+      <button class="btn" id="btnCopyLink">Copy Link Website</button>
+      <span class="small" id="copyHint"></span>
+    </div>
+
+    <!-- History (optional from umi-status.json) -->
+    <div class="historyWrap" id="historyBlock" style="display:none;">
+      <div class="muted">📜 History update</div>
+      <div id="umiHistoryWrap"></div>
+    </div>
   </div>
 
   <!-- Schedule list -->
@@ -172,9 +167,17 @@
 
 <script>
   const TZ = "Asia/Kuala_Lumpur";
-  const UMI_JSON_URL = "./umi-status.json";
 
-  // Parse time as +08:00 if no timezone included
+  // Files
+  const LATEST_TXT_URL = "./latest.txt";
+  const HISTORY_JSON_URL = "./umi-status.json"; // optional
+
+  // State for Copy WA
+  let latestTimeRaw = "";
+  let latestBody = "";
+  let onDutySummary = "";
+
+  // Parse schedule timestamps as +08:00 if no timezone included
   function parseKL(ts){
     if (!ts) return new Date(NaN);
     const hasTZ = /Z$|[+\-]\d{2}:\d{2}$/.test(ts);
@@ -182,7 +185,8 @@
     return new Date(fixed);
   }
 
-  function fmt(dt) {
+  // Human-friendly date/time (for schedule/history)
+  function fmtKL(dt) {
     return new Intl.DateTimeFormat("ms-MY", {
       timeZone: TZ,
       weekday: "short",
@@ -195,7 +199,7 @@
     }).format(parseKL(dt));
   }
 
-  function minutesAgo(isoLike) {
+  function minutesAgoFromISO(isoLike) {
     const d = parseKL(isoLike);
     const diff = Date.now() - d.getTime();
     const mins = Math.floor(diff / 60000);
@@ -208,39 +212,135 @@
     return Math.floor(hrs / 24) + " hari lalu";
   }
 
+  function setCopyHint(msg, ok=true){
+    const el = document.getElementById("copyHint");
+    el.innerText = msg || "";
+    el.style.color = ok ? "#16a34a" : "#b91c1c";
+    if (msg) setTimeout(()=>{ el.innerText=""; }, 2500);
+  }
+
+  async function copyText(text){
+    try{
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch(e){
+      // fallback
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return ok;
+    }
+  }
+
+  /* =========================
+     1) Load latest.txt
+     Format:
+       line1 = time (any text)
+       line2.. = message body
+  ========================== */
+  async function loadLatestTxt(){
+    try{
+      const res = await fetch(LATEST_TXT_URL + "?t=" + Date.now(), { cache:"no-store" });
+      const text = await res.text();
+
+      const lines = text.replace(/\r/g,"").trim().split("\n");
+      latestTimeRaw = (lines.shift() || "").trim();
+      latestBody = lines.join("\n").trim();
+
+      if (!latestBody){
+        latestBody = "(Tiada mesej. Sila isi latest.txt)";
+      }
+
+      document.getElementById("umiStatusText").innerText = latestBody;
+
+      // If line1 looks ISO-ish, show "x min ago"; else show raw time
+      const looksISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?/.test(latestTimeRaw);
+      if (looksISO){
+        document.getElementById("umiStatusTime").innerText = "Dikemas kini " + minutesAgoFromISO(latestTimeRaw);
+      } else {
+        document.getElementById("umiStatusTime").innerText = "Dikemas kini: " + latestTimeRaw;
+      }
+    } catch(e){
+      document.getElementById("umiStatusText").innerText = "Gagal load latest.txt";
+      document.getElementById("umiStatusTime").innerText = "";
+      latestTimeRaw = "";
+      latestBody = "";
+    }
+  }
+
+  /* =========================
+     2) Optional: Load history from umi-status.json
+     If exists and valid, show history list.
+  ========================== */
+  async function loadHistoryJsonOptional(){
+    try{
+      const res = await fetch(HISTORY_JSON_URL + "?t=" + Date.now(), { cache:"no-store" });
+      if (!res.ok) throw new Error("no history");
+      const data = await res.json();
+
+      const history = (data?.history || []).slice()
+        .filter(h => h && h.updatedAt && h.text)
+        .sort((a,b)=> parseKL(b.updatedAt) - parseKL(a.updatedAt));
+
+      if (!history.length) throw new Error("empty");
+
+      document.getElementById("historyBlock").style.display = "block";
+      document.getElementById("umiHistoryWrap").innerHTML =
+        history.map((h,idx)=>`
+          <div class="history-item">
+            <div class="history-time">${idx===0 ? "⭐ " : ""}${fmtKL(h.updatedAt)} • ${minutesAgoFromISO(h.updatedAt)}</div>
+            <div class="history-text">${h.text}</div>
+          </div>
+        `).join("");
+    } catch(e){
+      // Hide history block if missing/invalid
+      document.getElementById("historyBlock").style.display = "none";
+      document.getElementById("umiHistoryWrap").innerHTML = "";
+    }
+  }
+
+  /* =========================
+     Schedule render
+  ========================== */
   function renderSchedule(){
     const now = new Date();
 
     const slots = (SCHEDULE?.slots || [])
       .slice()
-      .sort((a,b) => parseKL(a.start) - parseKL(b.start));
+      .sort((a,b)=> parseKL(a.start) - parseKL(b.start));
 
     const winStart = SCHEDULE?.windowStart;
     const winEnd = SCHEDULE?.windowEnd;
 
     const current = slots.find(s => now >= parseKL(s.start) && now < parseKL(s.end));
 
+    // top pill + on duty summary
     const statusPill = document.getElementById("statusPill");
     const onDutyText = document.getElementById("onDutyText");
     const onDutyWindow = document.getElementById("onDutyWindow");
     const backupText = document.getElementById("backupText");
 
-    onDutyWindow.innerText = `Window: ${fmt(winStart)} → ${fmt(winEnd)}`;
+    onDutyWindow.innerText = `Window: ${fmtKL(winStart)} → ${fmtKL(winEnd)}`;
     backupText.innerText = `Backup: ${SCHEDULE?.backup || "-"}`;
 
     if (current){
       statusPill.className = "pill ok";
       statusPill.innerText = "Sedang berjalan";
       onDutyText.innerText = `${current.person} — ${current.label}`;
+      onDutySummary = `Penjaga sekarang: ${current.person} (${current.label})`;
     } else {
       const ended = winEnd && now >= parseKL(winEnd);
       statusPill.className = ended ? "pill bad" : "pill warn";
       statusPill.innerText = ended ? "Tamat" : "Tiada slot";
       onDutyText.innerText = ended ? "Jadual tamat (kemas kini jika sambung)" : "Tiada penjaga dikesan sekarang";
+      onDutySummary = ended ? "Penjaga sekarang: (jadual tamat)" : "Penjaga sekarang: (tiada slot)";
     }
 
-    // Build list rows (no overflow)
-    const rows = slots.map(s => {
+    // list rows
+    const rows = slots.map(s=>{
       const start = parseKL(s.start);
       const end = parseKL(s.end);
 
@@ -248,16 +348,15 @@
       if (now >= end) state = "done";
       else if (now >= start && now < end) state = "active";
 
-      const dotClass = state === "active" ? "dot-green" : (state === "done" ? "dot-red" : "dot-gray");
-      const rowClass = "row " + state;
+      const dotClass = state==="active" ? "dot-green" : (state==="done" ? "dot-red" : "dot-gray");
 
       return `
-        <div class="${rowClass}">
+        <div class="row ${state}">
           <div class="cellTime">
             <span class="dot ${dotClass}" style="margin-top:4px;"></span>
             <div style="min-width:0;">
-              <div class="timeMain">${fmt(s.start)}</div>
-              <div class="timeSub">→ ${fmt(s.end)}</div>
+              <div class="timeMain">${fmtKL(s.start)}</div>
+              <div class="timeSub">→ ${fmtKL(s.end)}</div>
             </div>
           </div>
           <div class="cellName">${s.person}</div>
@@ -266,9 +365,10 @@
       `;
     }).join("");
 
-    document.getElementById("listWrap").innerHTML = rows || `<div class="small" style="padding:10px 8px;">Tiada slot.</div>`;
+    document.getElementById("listWrap").innerHTML =
+      rows || `<div class="small" style="padding:10px 8px;">Tiada slot.</div>`;
 
-    // Mermaid
+    // Mermaid timeline
     const gantt = `
 gantt
   title Jadual Penjagaan Mak
@@ -285,38 +385,52 @@ gantt
     mermaid.run({ querySelector:"#mermaidGantt" });
   }
 
-  async function renderUmi(){
-    try{
-      const res = await fetch(UMI_JSON_URL + "?t=" + Date.now(), { cache:"no-store" });
-      const data = await res.json();
+  /* =========================
+     Buttons: Copy WhatsApp / Copy Link
+  ========================== */
+  function buildWhatsAppText(){
+    const lineTime = latestTimeRaw ? `🕒 ${latestTimeRaw}` : "";
+    const lineDuty = onDutySummary ? `👩‍⚕️ ${onDutySummary}` : "";
+    const link = window.location.href;
 
-      document.getElementById("umiStatusText").innerText = data?.latest?.text || "—";
-      document.getElementById("umiStatusTime").innerText =
-        data?.latest?.updatedAt ? ("Dikemas kini " + minutesAgo(data.latest.updatedAt)) : "—";
-
-      const history = (data?.history || []).slice().sort((a,b)=> parseKL(b.updatedAt) - parseKL(a.updatedAt));
-      const html = history.map((h,idx)=>`
-        <div class="history-item">
-          <div class="history-time">${idx===0 ? "⭐ Latest • " : ""}${fmt(h.updatedAt)} • ${minutesAgo(h.updatedAt)}</div>
-          <div class="history-text">${h.text || "—"}</div>
-        </div>
-      `).join("");
-
-      document.getElementById("umiHistoryWrap").innerHTML = `
-        <div class="muted">📜 History update</div>
-        ${html || "<div class='small'>History kosong.</div>"}
-      `;
-    } catch(e){
-      document.getElementById("umiStatusText").innerText = "Gagal load status umi.";
-      document.getElementById("umiStatusTime").innerText = "";
-      document.getElementById("umiHistoryWrap").innerHTML = "";
-    }
+    // WhatsApp-friendly
+    return [
+      "🩺 *Update Umi*",
+      lineTime,
+      lineDuty,
+      "",
+      latestBody || "",
+      "",
+      "🔗 " + link
+    ].filter(Boolean).join("\n");
   }
 
-  renderSchedule();
-  renderUmi();
+  async function initButtons(){
+    document.getElementById("btnCopyWA").addEventListener("click", async ()=>{
+      const ok = await copyText(buildWhatsAppText());
+      setCopyHint(ok ? "✅ Dah copy untuk WhatsApp" : "❌ Copy gagal", ok);
+    });
+
+    document.getElementById("btnCopyLink").addEventListener("click", async ()=>{
+      const ok = await copyText(window.location.href);
+      setCopyHint(ok ? "✅ Link dah copy" : "❌ Copy gagal", ok);
+    });
+  }
+
+  /* =========================
+     Init
+  ========================== */
+  async function init(){
+    await loadLatestTxt();
+    await loadHistoryJsonOptional();
+    renderSchedule();
+    initButtons();
+  }
+
+  init();
+  setInterval(loadLatestTxt, 60000);
+  setInterval(loadHistoryJsonOptional, 90000);
   setInterval(renderSchedule, 30000);
-  setInterval(renderUmi, 60000);
 </script>
 
 </body>
