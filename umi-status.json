@@ -1,13 +1,17 @@
 {
   "latest": {
     "updatedAt": "2025-12-29T13:30:00",
-    "text": "Banyak tidur hari ni. Kepada yang nak ziarah, Tok CT @ mi berada di Katil 6 ."
+    "text": "Banyak tidur hari ni. Kepada yang nak ziarah, Tok CT @ mi berada di Katil 6."
   },
   "history": [
     {
-     "updatedAt": "2025-12-29T11:30:00",
-    "text": "Umi stabil. Antibiotik diteruskan. Boleh menelan air sikit2."
+      "updatedAt": "2025-12-29T13:30:00",
+      "text": "Banyak tidur hari ni. Kepada yang nak ziarah, Tok CT @ mi berada di Katil 6."
+    },
     {
+      "updatedAt": "2025-12-29T11:30:00",
+      "text": "Umi stabil. Antibiotik diteruskan. Boleh menelan air sikit2."
+    },
     {
       "updatedAt": "2025-12-29T07:30:00",
       "text": "Umi stabil. Boleh respons bercakap."
