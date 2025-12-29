@@ -1,0 +1,16 @@
+{
+  "latest": {
+    "updatedAt": "2025-01-01T11:30:00",
+    "text": "Umi stabil. Antibiotik diteruskan. Makan bubur sikit."
+  },
+  "history": [
+    {
+      "updatedAt": "2025-01-01T11:30:00",
+      "text": "Umi stabil. Antibiotik diteruskan. Makan bubur sikit."
+    },
+    {
+      "updatedAt": "2025-01-01T09:10:00",
+      "text": "O2 ok. Kurang batuk. Masih lemah."
+    }
+  ]
+}
