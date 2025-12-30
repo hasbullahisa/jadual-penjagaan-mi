@@ -14,13 +14,13 @@ window.SCHEDULE = {
 
     // Morning shifts (Kak Jah)
     { start: "2025-12-29T08:00:00", end: "2025-12-29T14:00:00", person: "Kak Jah", label: "Pagi" },
-    { start: "2025-12-30T08:00:00", end: "2025-12-30T14:00:00", person: "Kak Jah", label: "Pagi" },
-    { start: "2025-12-31T08:00:00", end: "2025-12-31T14:00:00", person: "Kak Jah", label: "Pagi" },
+    { start: "2025-12-30T08:00:00", end: "2025-12-30T14:00:00", person: "Along", label: "Pagi" },
+    { start: "2025-12-31T08:00:00", end: "2025-12-31T14:00:00", person: "Along", label: "Pagi" },
 
     // Afternoon shifts (Along)
     { start: "2025-12-29T14:00:00", end: "2025-12-29T20:00:00", person: "Along", label: "Petang" },
-    { start: "2025-12-30T14:00:00", end: "2025-12-30T20:00:00", person: "Along", label: "Petang" },
-    { start: "2025-12-31T14:00:00", end: "2025-12-31T20:00:00", person: "Along", label: "Petang" },
+    { start: "2025-12-30T14:00:00", end: "2025-12-30T20:00:00", person: "Kak Jah", label: "Petang" },
+    { start: "2025-12-31T14:00:00", end: "2025-12-31T20:00:00", person: "Kak Jah", label: "Petang" },
   ],
   backup: "Kak Cik (On-call / backup, ikut kemampuan)"
 };
