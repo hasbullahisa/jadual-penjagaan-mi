@@ -8,7 +8,7 @@ window.SCHEDULE = {
   windowEnd: "2025-12-31T20:00:00",
   slots: [
     // Night shifts (Bibik Yuni)
-    { start: "2025-12-28T20:00:00", end: "2025-12-29T08:00:00", person: "Hasbullah", label: "Malam" },
+    { start: "2025-12-28T20:00:00", end: "2025-12-29T08:00:00", person: "Bibik Yuni", label: "Malam" },
     { start: "2025-12-29T20:00:00", end: "2025-12-30T08:00:00", person: "Bibik Yuni", label: "Malam" },
     { start: "2025-12-30T20:00:00", end: "2025-12-31T08:00:00", person: "Bibik Yuni", label: "Malam" },
 
