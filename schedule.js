@@ -22,5 +22,5 @@ window.SCHEDULE = {
     { start: "2025-12-30T14:00:00", end: "2025-12-30T20:00:00", person: "Kak Jah", label: "Petang" },
     { start: "2025-12-31T14:00:00", end: "2025-12-31T20:00:00", person: "Kak Jah", label: "Petang" },
   ],
-  backup: "Kak Cik (On-call / backup, ikut kemampuan)"
+  backup: "Kak Cik (On-call / backup, Logistik, ikut kemampuan)"
 };
