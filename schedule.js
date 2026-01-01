@@ -12,6 +12,7 @@ window.SCHEDULE = {
     { start: "2025-12-29T20:00:00", end: "2025-12-30T08:00:00", person: "Bibik Yuni", label: "Malam" },
     { start: "2025-12-30T20:00:00", end: "2025-12-31T08:00:00", person: "Bibik Yuni", label: "Malam" },
     { start: "2025-12-31T20:00:00", end: "2026-01-01T08:00:00", person: "Bibik Yuni", label: "Malam" },
+    { start: "2025-12-31T20:00:00", end: "2026-01-01T08:00:00", person: "Bibik Yuni", label: "Malam" },
 
     // Morning shifts (Kak Jah)
     { start: "2025-12-29T08:00:00", end: "2025-12-29T14:00:00", person: "Kak Jah", label: "Pagi" },
